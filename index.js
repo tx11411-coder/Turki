@@ -3,16 +3,18 @@ import wolfjs from 'wolf.js';
 const { WOLF } = wolfjs;
 
 const settings = {
+    // تأكد من تغيير هذه القيم في ملف .env الخاص بك
     identity: process.env.U_MAIL_2 || 'your_second_email@example.com',
     secret: process.env.U_PASS_2 || 'your_second_password',
-    taskGroupId: 330865 ,
+    taskGroupId: 330865,
     depositGroupId: 224,
     minuteInterval: 63 * 1000,
     boxInterval: 3 * 60 * 1000
 };
 
 const MY_INFO = {
-    keyword: "🐈‍⬛",  // الكلمة الدلالية للحساب الثاني
+    // استخدمنا جزءاً من الرمز لضمان الرصد الصحيح
+    keyword: "🐈",  
     ownerId: "2481425"  
 };
 
@@ -48,48 +50,46 @@ service.on('groupMessage', async (message) => {
         const content = message.body;
         const isMe = message.subscriberId === service.currentSubscriber.id;
 
-        // 1. التوقف الإنتاجي (يتفاعل فقط مع رسائل الإيقاف الخاصة بـ 🐈‍⬛)
+        // --- ميزة التجاهل القطعي لـ فزآعنا ---
+        if (content.includes("فزآعنا")) return;
+
+        // 1. التوقف الإنتاجي (يتفاعل مع 🐈)
         if (content.includes("تم إيقاف الأوامر الإنتاجية مؤقتًا") && content.includes(MY_INFO.keyword)) {
             const match = content.match(/\d+/); 
             if (match) {
                 isPaused = true;
-                console.log(`⚠️ توقف إنتاجي لـ 🐈‍⬛ لمدة ${match[0]} دقيقة.`);
+                console.log(`⚠️ توقف إنتاجي لـ ${MY_INFO.keyword} لمدة ${match[0]} دقيقة.`);
                 setTimeout(() => { isPaused = false; }, parseInt(match[0]) * 60 * 1000);
             }
             return;
         }
 
-        // تجاهل أي رسالة إيقاف تخص فزآعنا
-        if (content.includes("تم إيقاف الأوامر الإنتاجية") && content.includes("فزآعنا")) return;
-
         // 2. إيقاف الصناديق لنفاذ المفاتيح
         if (content.includes("لا تملك مفاتيح!") && message.targetGroupId === settings.taskGroupId) {
-            if (Date.now() - lastBoxCommandTime < 5000) canOpenBoxes = false;
+            if (Date.now() - lastBoxCommandTime < 5000) {
+                canOpenBoxes = false;
+                console.log("🚫 توقفت الصناديق لهذا الحساب.");
+            }
             return;
         }
 
-        // 3. نظام الأولوية الشامل (يتفاعل مع 🐈‍⬛ ويتجاهل فزآعنا)
+        // 3. نظام الأولوية للحل
         const isTrap = content.includes("لأنك لاعب مجتهد جدًا اليوم") || content.includes("سؤال التحقق الخاص بك هو");
         const isSafetyAlert = content.includes("يوجد سؤال تحقق نشط");
 
-        // شرط الاستجابة: (فخ يخص 🐈‍⬛) أو (تنبيه فحص عام بشرط أن يكون البوت هو من أرسل الأمر قبل 5 ثوانٍ)
         if ((isTrap && content.includes(MY_INFO.keyword)) || isSafetyAlert) {
             
-            // تجاهل الفخاخ الصريحة الموجهة لـ "فزآعنا"
-            if (isTrap && content.includes("فزآعنا")) return;
-
-            // أ. التحقق المقيد بـ 5 ثوانٍ لضمان التبعية لـ 🐈‍⬛
+            // التحقق المقيد بـ 5 ثوانٍ لضمان التبعية للحساب الحالي
             if (isSafetyAlert) {
                 const now = Date.now();
-                if ((now - lastRoutineCommandTime <= 5000) || (now - lastBoxCommandTime <= 5000)) {
+                if ((now - lastRoutineCommandTime <= 5500) || (now - lastBoxCommandTime <= 5500)) {
                     await service.messaging.sendGroupMessage(message.targetGroupId, "!مد فحص");
                 }
                 return;
             }
 
             let answer = null;
-            // --- محرك الحل الكامل لجميع أنواع الفخاخ ---
-
+            // --- محرك الحل الكامل ---
             if (content.includes('عضوية')) answer = MY_INFO.ownerId;
             else if (content.includes('بالكلمات') || content.includes('بالحروف')) {
                 const match = content.match(/\d+/);
@@ -98,7 +98,7 @@ service.on('groupMessage', async (message) => {
             else if (content.includes('بالأرقام')) {
                 for (let word in wordToNum) { if (content.includes(word)) { answer = wordToNum[word]; break; } }
             }
-            else if (content.includes('اكتب') && (content.includes('كلمة') || content.includes('كما هي'))) {
+            else if (content.includes('اكتب') && (content.includes('كما هي'))) {
                 const match = content.match(/:\s*(\S+)/) || content.match(/هي\s+(\S+)/);
                 if (match) answer = match[1];
             }
@@ -129,7 +129,7 @@ service.on('groupMessage', async (message) => {
 });
 
 service.on('ready', async () => {
-    console.log(`🚀 بوت الحساب الثاني (🐈‍⬛) جاهز ويتجاهل "فزآعنا".`);
+    console.log(`🚀 بوت الحساب (🐈) جاهز الآن.`);
     try {
         await service.group.joinById(settings.taskGroupId);
         await service.group.joinById(settings.depositGroupId);
