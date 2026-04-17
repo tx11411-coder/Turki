@@ -3,9 +3,8 @@ import wolfjs from 'wolf.js';
 const { WOLF } = wolfjs;
 
 const settings = {
-    // تأكد من تغيير هذه القيم في ملف .env الخاص بك
-    identity: process.env.U_MAIL_2 || 'your_second_email@example.com',
-    secret: process.env.U_PASS_2 || 'your_second_password',
+    identity: process.env.U_MAIL || 'your_email@example.com',
+    secret: process.env.U_PASS || 'your_password',
     taskGroupId: 330865,
     depositGroupId: 224,
     minuteInterval: 63 * 1000,
@@ -13,8 +12,7 @@ const settings = {
 };
 
 const MY_INFO = {
-    // استخدمنا جزءاً من الرمز لضمان الرصد الصحيح
-    keyword: "🐈",  
+    keyword: "🐈‍⬛",  
     ownerId: "2481425"  
 };
 
@@ -48,17 +46,17 @@ service.on('groupMessage', async (message) => {
         if (!isTargetGroup) return;
 
         const content = message.body;
+        if (content.includes("فزآعنا")) {
+    return; 
+}
+
         const isMe = message.subscriberId === service.currentSubscriber.id;
 
-        // --- ميزة التجاهل القطعي لـ فزآعنا ---
-        if (content.includes("فزآعنا")) return;
-
-        // 1. التوقف الإنتاجي (يتفاعل مع 🐈)
+        // 1. التوقف الإنتاجي
         if (content.includes("تم إيقاف الأوامر الإنتاجية مؤقتًا") && content.includes(MY_INFO.keyword)) {
             const match = content.match(/\d+/); 
             if (match) {
                 isPaused = true;
-                console.log(`⚠️ توقف إنتاجي لـ ${MY_INFO.keyword} لمدة ${match[0]} دقيقة.`);
                 setTimeout(() => { isPaused = false; }, parseInt(match[0]) * 60 * 1000);
             }
             return;
@@ -66,58 +64,72 @@ service.on('groupMessage', async (message) => {
 
         // 2. إيقاف الصناديق لنفاذ المفاتيح
         if (content.includes("لا تملك مفاتيح!") && message.targetGroupId === settings.taskGroupId) {
-            if (Date.now() - lastBoxCommandTime < 5000) {
-                canOpenBoxes = false;
-                console.log("🚫 توقفت الصناديق لهذا الحساب.");
-            }
+            if (Date.now() - lastBoxCommandTime < 5000) canOpenBoxes = false;
             return;
         }
 
-        // 3. نظام الأولوية للحل
+        // 3. نظام الأولوية الشامل لحل الفخاخ والتحقق
         const isTrap = content.includes("لأنك لاعب مجتهد جدًا اليوم") || content.includes("سؤال التحقق الخاص بك هو");
         const isSafetyAlert = content.includes("يوجد سؤال تحقق نشط");
 
-        if ((isTrap && content.includes(MY_INFO.keyword)) || isSafetyAlert) {
+        if ((isTrap && content.includes(MY_INFO.keyword)) || isSafetyAlert || (isTrap && content.includes("سؤال التحقق"))) {
             
-            // التحقق المقيد بـ 5 ثوانٍ لضمان التبعية للحساب الحالي
+            // أ. التحقق المقيد بـ 5 ثوانٍ (لضمان أنه لك)
             if (isSafetyAlert) {
                 const now = Date.now();
-                if ((now - lastRoutineCommandTime <= 5500) || (now - lastBoxCommandTime <= 5500)) {
+                if ((now - lastRoutineCommandTime <= 5000) || (now - lastBoxCommandTime <= 5000)) {
                     await service.messaging.sendGroupMessage(message.targetGroupId, "!مد فحص");
                 }
                 return;
             }
 
             let answer = null;
-            // --- محرك الحل الكامل ---
+            // --- جميع طرق التحقق المستخلصة ---
+
+            // 1. عضوية المالك ( ownerId )
             if (content.includes('عضوية')) answer = MY_INFO.ownerId;
+
+            // 2. التحويل إلى كلمات (بالكلمات / بالحروف)
             else if (content.includes('بالكلمات') || content.includes('بالحروف')) {
                 const match = content.match(/\d+/);
                 if (match && numToWord[match[0]]) answer = numToWord[match[0]];
             }
-            else if (content.includes('بالأرقام')) {
+
+            // 3. التحويل إلى أرقام (بالأرقام)
+            else if (content.includes('بالأرقام') || content.includes('بالارقام')) {
                 for (let word in wordToNum) { if (content.includes(word)) { answer = wordToNum[word]; break; } }
             }
-            else if (content.includes('اكتب') && (content.includes('كما هي'))) {
+
+            // 4. كتابة الكلمة كما هي ( اكتب / كلمة / كما هي )
+            else if (content.includes('اكتب') && (content.includes('كلمة') || content.includes('كما هي'))) {
                 const match = content.match(/:\s*(\S+)/) || content.match(/هي\s+(\S+)/);
                 if (match) answer = match[1];
             }
-            else if (content.includes('صح أم خطأ') || content.includes('التحالف')) answer = "صح";
-            else if (content.includes('أيهما')) {
-                const nums = content.match(/\d+/g);
-                if (nums && nums.length >= 2) {
-                    const n1 = parseInt(nums[0]), n2 = parseInt(nums[1]);
-                    answer = (content.includes('أكبر')) ? Math.max(n1, n2) : Math.min(n1, n2);
-                }
+
+            // 5. صح أم خطأ ( التحالف / الصناديق / صح أم خطأ )
+            else if (content.includes('صح أم خطأ') || content.includes('صح أو خطأ') || content.includes('التحالف') || content.includes('الصناديق')) {
+                answer = "صح";
             }
-            else if (content.includes('ناتج') || content.includes('+') || content.includes('-')) {
+
+            // 6. المقارنة ( أيهما أكبر / أصغر )
+            else if (content.includes('أيهما') || content.includes('ايهما')) {
                 const nums = content.match(/\d+/g);
                 if (nums && nums.length >= 2) {
                     const n1 = parseInt(nums[0]), n2 = parseInt(nums[1]);
-                    answer = (content.includes('-')) ? n1 - n2 : n1 + n2;
+                    answer = (content.includes('أكبر') || content.includes('اكبر')) ? Math.max(n1, n2) : Math.min(n1, n2);
                 }
             }
 
+            // 7. العمليات الحسابية ( ناتج / + / - / طرح / جمع )
+            else if (content.includes('ناتج') || content.includes('+') || content.includes('-') || content.includes('جمع') || content.includes('طرح')) {
+                const nums = content.match(/\d+/g);
+                if (nums && nums.length >= 2) {
+                    const n1 = parseInt(nums[0]), n2 = parseInt(nums[1]);
+                    answer = (content.includes('-') || content.includes('طرح') || content.includes('ناقص')) ? n1 - n2 : n1 + n2;
+                }
+            }
+
+            // إرسال الإجابة بعد 5 ثوانٍ واستئناف الأوامر
             if (answer !== null) {
                 setTimeout(async () => {
                     await service.messaging.sendGroupMessage(message.targetGroupId, `!${answer}`);
@@ -129,7 +141,7 @@ service.on('groupMessage', async (message) => {
 });
 
 service.on('ready', async () => {
-    console.log(`🚀 بوت الحساب (🐈) جاهز الآن.`);
+    console.log(`🚀 البوت مكتمل: جميع طرق الحل مدمجة + حماية الفحص مفعلة.`);
     try {
         await service.group.joinById(settings.taskGroupId);
         await service.group.joinById(settings.depositGroupId);
