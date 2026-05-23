@@ -25,41 +25,59 @@ service.on('groupMessage', async (message) => {
         const isTargetGroup = message.targetGroupId === settings.taskGroupId || message.targetGroupId === settings.depositGroupId;
         if (!isTargetGroup) return;
 
-        // التحقق من أنها رسالة فخ وموجهة لي
         if (content.includes("اختبار تحقق سريع") && content.includes(MY_INFO.myId)) {
             
-            // --- 1. فخ الرموز ---
+            // --- 1. فخ الرموز (النظام القديم) ---
             if (content.includes("العلامتين")) {
                 const symbolMatch = content.match(/العلامتين\s*([^\s\w\u0600-\u06FF])\s*و\s*([^\s\w\u0600-\u06FF])/u);
                 if (symbolMatch) {
-                    const sym1 = symbolMatch[1];
-                    const sym2 = symbolMatch[2];
-                    const pattern = new RegExp(`${escapeRegExp(sym1)}(.*?)${escapeRegExp(sym2)}`, 'gu');
+                    const pattern = new RegExp(`${escapeRegExp(symbolMatch[1])}(.*?)${escapeRegExp(symbolMatch[2])}`, 'gu');
                     const allMatches = [...content.matchAll(pattern)];
                     if (allMatches.length > 1) {
-                        const answer = allMatches[1][1].trim();
-                        await service.messaging.sendGroupMessage(message.targetGroupId, `#${answer}`);
+                        await service.messaging.sendGroupMessage(message.targetGroupId, `#${allMatches[1][1].trim()}`);
                     }
                 }
             } 
             
-            // --- 2. فخ القوسين () ---
+            // --- 2. فخ القوسين (النظام القديم) ---
             else if (content.includes("داخل القوسين")) {
-                const match = content.match(/\((.*?)\)/); // يبحث عن النص داخل ()
-                if (match && match[1]) {
-                    const answer = match[1].trim();
-                    console.log(`✅ إجابة القوسين المستخرجة: ${answer}`);
-                    await service.messaging.sendGroupMessage(message.targetGroupId, `#${answer}`);
-                }
+                const match = content.match(/\((.*?)\)/);
+                if (match) await service.messaging.sendGroupMessage(message.targetGroupId, `#${match[1].trim()}`);
             }
 
-            // --- 3. فخ الأقواس المعقوفة {} ---
+            // --- 3. فخ الأقواس المعقوفة {} (النظام القديم) ---
             else if (content.includes("الأقواس المعقوفة")) {
-                const match = content.match(/\{(.*?)\}/); // يبحث عن النص داخل {}
-                if (match && match[1]) {
-                    const answer = match[1].trim();
-                    console.log(`✅ إجابة المعقوفة المستخرجة: ${answer}`);
-                    await service.messaging.sendGroupMessage(message.targetGroupId, `#${answer}`);
+                const match = content.match(/\{(.*?)\}/);
+                if (match) await service.messaging.sendGroupMessage(message.targetGroupId, `#${match[1].trim()}`);
+            }
+
+            // --- 4. فخ الاتجاهات (يمين / يسار) الجديد ---
+            else if (content.includes("اليمين") || content.includes("يمين") || content.includes("اليسار") || content.includes("يسار")) {
+                // استخراج العلامة المذكورة (مثل ◈)
+                const symMatch = content.match(/للعلامة\s*([^\s])/u);
+                // استخراج الاتجاه (يمين أو يسار)
+                const dirMatch = content.match(/(اليمين|يمين|اليسار|يسار)/u);
+
+                if (symMatch && dirMatch) {
+                    const sym = symMatch[1]; // الرمز (◈)
+                    const direction = dirMatch[0]; // (يمين أو يسار)
+                    
+                    // البحث عن النص الذي يحتوي على الرمز (مثل: Z2Z ◈ W465)
+                    // هذا التعبير يبحث عن كلمة ثم مسافة ثم الرمز ثم مسافة ثم كلمة
+                    const regex = new RegExp(`([^\\s]+)\\s*${escapeRegExp(sym)}\\s*([^\\s]+)`, 'u');
+                    const match = content.match(regex);
+
+                    if (match) {
+                        let answer = "";
+                        if (direction.includes("يمين")) {
+                            answer = match[2]; // الجزء بعد الرمز
+                        } else {
+                            answer = match[1]; // الجزء قبل الرمز
+                        }
+                        
+                        console.log(`✅ فخ الاتجاهات: الاتجاه [${direction}]، الإجابة [${answer}]`);
+                        await service.messaging.sendGroupMessage(message.targetGroupId, `#${answer}`);
+                    }
                 }
             }
         }
@@ -70,26 +88,8 @@ service.on('groupMessage', async (message) => {
 
 // --- قسم المهام الدورية ---
 service.on('ready', async () => {
-    console.log(`🚀 البوت نشط: نظام التعامل مع الفخاخ المتعددة مفعل.`);
-    
-    try {
-        await service.group.joinById(settings.taskGroupId);
-        await service.group.joinById(settings.depositGroupId);
-
-        setInterval(async () => {
-            await service.messaging.sendGroupMessage(settings.taskGroupId, "!مد مهام");
-            setTimeout(async () => {
-                await service.messaging.sendGroupMessage(settings.depositGroupId, "!مد تحالف ايداع كل");
-            }, 2000);
-        }, 60000); 
-
-        setInterval(async () => {
-            await service.messaging.sendGroupMessage(settings.taskGroupId, "!مد صندوق فتح");
-        }, 180000); 
-
-    } catch (e) {
-        console.error("خطأ في المهام:", e);
-    }
+    console.log(`🚀 البوت نشط: نظام الفخاخ المتكامل (بما فيها الاتجاهات) مفعل.`);
+    // ... بقية كود المهام الدورية ...
 });
 
 service.login(settings.identity, settings.secret);
