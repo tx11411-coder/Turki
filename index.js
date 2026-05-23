@@ -25,43 +25,42 @@ service.on('groupMessage', async (message) => {
         const isTargetGroup = message.targetGroupId === settings.taskGroupId || message.targetGroupId === settings.depositGroupId;
         if (!isTargetGroup) return;
 
-        if (content.includes("تحقق") && content.includes(MY_INFO.myId)) {
+        // التحقق من أنها رسالة فخ وموجهة لي
+        if (content.includes("اختبار تحقق سريع") && content.includes(MY_INFO.myId)) {
             
-            // 1. استخراج الرموز من الرسالة
-            const symbolMatch = content.match(/العلامتين\s*([^\s\w\u0600-\u06FF])\s*و\s*([^\s\w\u0600-\u06FF])/u);
-
-            if (symbolMatch) {
-                const sym1 = symbolMatch[1];
-                const sym2 = symbolMatch[2];
-                console.log(`✅ تم تحديد العلامات: [${sym1}] و [${sym2}]`);
-
-                // 2. البحث عن كافة المطابقات في النص كاملاً
-                const pattern = new RegExp(`${escapeRegExp(sym1)}(.*?)${escapeRegExp(sym2)}`, 'gu');
-                const allMatches = [...content.matchAll(pattern)];
-
-                // 3. المنطق الجديد: إذا وجد أكثر من مطابقة، نأخذ الثانية (تجاهل الأولى الخاصة بالتعليمات)
-                // إذا وجد مطابقة واحدة فقط، نستخدمها هي
-                let targetResult;
-                if (allMatches.length > 1) {
-                    targetResult = allMatches[1]; // نأخذ المطابقة الثانية
-                    console.log(`🔎 تم العثور على ${allMatches.length} مطابقات، سأستخدم الثانية (تجاهل التعليمات).`);
-                } else if (allMatches.length === 1) {
-                    targetResult = allMatches[0];
-                    console.log(`🔎 تم العثور على مطابقة واحدة فقط.`);
-                }
-
-                if (targetResult && targetResult[1]) {
-                    const answer = targetResult[1].trim();
-                    console.log(`🚀 الإجابة النهائية المحددة: ${answer}`);
-                    
-                    setTimeout(async () => {
+            // --- 1. فخ الرموز ---
+            if (content.includes("العلامتين")) {
+                const symbolMatch = content.match(/العلامتين\s*([^\s\w\u0600-\u06FF])\s*و\s*([^\s\w\u0600-\u06FF])/u);
+                if (symbolMatch) {
+                    const sym1 = symbolMatch[1];
+                    const sym2 = symbolMatch[2];
+                    const pattern = new RegExp(`${escapeRegExp(sym1)}(.*?)${escapeRegExp(sym2)}`, 'gu');
+                    const allMatches = [...content.matchAll(pattern)];
+                    if (allMatches.length > 1) {
+                        const answer = allMatches[1][1].trim();
                         await service.messaging.sendGroupMessage(message.targetGroupId, `#${answer}`);
-                    }, 3000);
-                } else {
-                    console.log("❌ لم أجد نصاً بين العلامتين.");
+                    }
                 }
-            } else {
-                console.log("❌ فشل استخراج العلامات من نص السؤال.");
+            } 
+            
+            // --- 2. فخ القوسين () ---
+            else if (content.includes("داخل القوسين")) {
+                const match = content.match(/\((.*?)\)/); // يبحث عن النص داخل ()
+                if (match && match[1]) {
+                    const answer = match[1].trim();
+                    console.log(`✅ إجابة القوسين المستخرجة: ${answer}`);
+                    await service.messaging.sendGroupMessage(message.targetGroupId, `#${answer}`);
+                }
+            }
+
+            // --- 3. فخ الأقواس المعقوفة {} ---
+            else if (content.includes("الأقواس المعقوفة")) {
+                const match = content.match(/\{(.*?)\}/); // يبحث عن النص داخل {}
+                if (match && match[1]) {
+                    const answer = match[1].trim();
+                    console.log(`✅ إجابة المعقوفة المستخرجة: ${answer}`);
+                    await service.messaging.sendGroupMessage(message.targetGroupId, `#${answer}`);
+                }
             }
         }
     } catch (err) {
@@ -71,7 +70,8 @@ service.on('groupMessage', async (message) => {
 
 // --- قسم المهام الدورية ---
 service.on('ready', async () => {
-    console.log(`🚀 البوت يعمل الآن - نظام تجاهل التعليمات مفعل.`);
+    console.log(`🚀 البوت نشط: نظام التعامل مع الفخاخ المتعددة مفعل.`);
+    
     try {
         await service.group.joinById(settings.taskGroupId);
         await service.group.joinById(settings.depositGroupId);
@@ -86,6 +86,7 @@ service.on('ready', async () => {
         setInterval(async () => {
             await service.messaging.sendGroupMessage(settings.taskGroupId, "!مد صندوق فتح");
         }, 180000); 
+
     } catch (e) {
         console.error("خطأ في المهام:", e);
     }
