@@ -5,68 +5,59 @@ import axios from 'axios';
 const { WOLF } = wolfjs;
 const service = new WOLF();
 
+// الإعدادات
 const settings = {
     taskGroupId: 81889058,
     verificationGroupId: 9969,
-    minuteInterval: 60 * 1000
+    apiKey: process.env.API_KEY || 'K83171079488957' // مفتاحك
 };
 
-// دالة الحل عبر API OCR.space
+// دالة الحل عبر API
 async function solveCaptcha(imageUrl) {
     try {
-        console.log("جاري إرسال الصورة للتحليل...");
+        console.log("جاري إرسال الصورة للـ API...");
         const response = await axios.post('https://api.ocr.space/parse/image', null, {
-            params: {
-                apikey: process.env.API_KEY,
-                url: imageUrl,
-                language: 'eng',
-                OCREngine: 2
-            }
+            params: { apikey: settings.apiKey, url: imageUrl, language: 'eng', OCREngine: 2 }
         });
-
-        if (response.data.ParsedResults && response.data.ParsedResults.length > 0) {
+        if (response.data.ParsedResults?.length > 0) {
             return response.data.ParsedResults[0].ParsedText.trim();
         }
         return null;
-    } catch (err) {
-        console.error("خطأ في الاتصال بـ API:", err.message);
-        return null;
-    }
+    } catch (err) { return null; }
 }
 
-// مراقبة الرسائل لاكتشاف الصور
 service.on('groupMessage', async (message) => {
-    // التحقق من وجود مرفقات (صور)
-    if (message.attachments && message.attachments.length > 0) {
-        const imageUrl = message.attachments[0].link; // رابط الصورة
-        
-        console.log("تم اكتشاف صورة في القناة، جاري المعالجة...");
-        
+    // 1. طباعة كامل بيانات الرسالة في السجلات (Logs) لكي نكتشف مكان الصورة
+    console.log("--- تفاصيل الرسالة المستلمة ---");
+    console.log(JSON.stringify(message, null, 2));
+
+    // 2. محاولات استخراج رابط الصورة (بناءً على هياكل WOLF المختلفة)
+    let imageUrl = null;
+
+    // الطريقة الأولى: المرفقات التقليدية
+    if (message.attachments && message.attachments[0]) {
+        imageUrl = message.attachments[0].link || message.attachments[0].url;
+    }
+    
+    // الطريقة الثانية: إذا كانت الصورة من نوع ميديا
+    if (!imageUrl && message.media) {
+        imageUrl = message.media.url || message.media.link;
+    }
+
+    if (imageUrl) {
+        console.log("✅ تم العثور على رابط صورة:", imageUrl);
         const solution = await solveCaptcha(imageUrl);
-        
         if (solution) {
-            console.log(`تم استخراج الرمز: ${solution}`);
-            // إرسال الحل
-            setTimeout(async () => {
-                await service.messaging.sendGroupMessage(settings.verificationGroupId, `#${solution}`);
-            }, 2000); 
+            console.log("🔑 الحل المستخرج:", solution);
+            await service.messaging.sendGroupMessage(settings.verificationGroupId, `#${solution}`);
         }
+    } else {
+        console.log("❌ لم يتم العثور على رابط صورة في هذه الرسالة.");
     }
 });
 
-// المهام الدورية
-const runTasks = async () => {
-    try {
-        await service.messaging.sendGroupMessage(settings.taskGroupId, "!مد مهام");
-        setTimeout(async () => {
-            await service.messaging.sendGroupMessage(settings.taskGroupId, "!مد تحالف ايداع كل");
-        }, 3000);
-    } catch (e) {}
-};
-
 service.on('ready', async () => {
-    console.log("✅ البوت متصل ويراقب الصور...");
-    setInterval(runTasks, settings.minuteInterval);
+    console.log("🚀 البوت متصل ويراقب القناة...");
 });
 
 service.login(process.env.U_MAIL, process.env.U_PASS);
