@@ -49,7 +49,7 @@ service.on('groupMessage', async (message) => {
     // 2. استخراج رابط الصورة
     let imageUrl = null;
     if (message.type === 'text/image_link') {
-        imageUrl = message.body; // الصورة كـ رابط نصي
+        imageUrl = message.body; // الصورة كـ رابط نصي كما ظهر في السجلات
     } else if (message.attachments && message.attachments.length > 0) {
         imageUrl = message.attachments[0].link; // الصورة كمرفق
     }
