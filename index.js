@@ -2,19 +2,14 @@ import wolfjs from 'wolf.js';
 import axios from 'axios';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// ⚠️ ضع مفتاحك هنا
+// ضع مفتاح الـ API الخاص بك هنا
 const GEMINI_API_KEY = 'AIzaSyBPR7jm6_v0ESdnLanaln8DLHQWLTFulZs'; 
 
 const { WOLF } = wolfjs;
 const service = new WOLF();
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
-const settings = {
-    allowedGroupIds: [ 81889058], // تأكد من مطابقة هذه الأرقام للمجموعة التي ترسل فيها
-    verificationGroupId: 9969
-};
-
-// تحويل الصورة لرابط يمكن لـ Gemini فهمه
+// دالة تحويل الصورة لرابط يمكن لـ Gemini فهمه
 async function urlToGenerativePart(url) {
     const response = await axios.get(url, { responseType: 'arraybuffer' });
     return {
@@ -41,10 +36,8 @@ async function solveCaptchaWithAI(imageUrl) {
 }
 
 service.on('groupMessage', async (message) => {
-    // تشخيص: سيطبع هذا السطر أي رسالة تصل للبوت، إذا لم يظهر شيء هنا، فالبوت لا يرى الرسائل
-    console.log(`📩 رسالة جديدة في مجموعة ${message.targetGroupId}`);
-
-    if (!settings.allowedGroupIds.includes(message.targetGroupId)) return;
+    // فلتر المجموعات: الكود سيتوقف فوراً إذا لم تكن الرسالة من الروم المطلوب
+    if (message.targetGroupId !== 81889058) return;
 
     let imageUrl = null;
     
@@ -53,17 +46,16 @@ service.on('groupMessage', async (message) => {
     else if (message.attachments && message.attachments.length > 0) imageUrl = message.attachments[0].link;
 
     if (imageUrl) {
-        console.log(`✅ تم اكتشاف صورة، جاري التحليل...`);
+        console.log(`✅ تم اكتشاف صورة في الروم ${message.targetGroupId}، جاري التحليل...`);
         const solution = await solveCaptchaWithAI(imageUrl);
         
         if (solution) {
             console.log(`🔑 الحل المستخرج: ${solution}`);
-            await service.messaging.sendGroupMessage(settings.verificationGroupId, `#${solution}`);
+            await service.messaging.sendGroupMessage(message.targetGroupId, `#${solution}`);
         }
     }
 });
 
-service.on('ready', () => console.log("🚀 البوت متصل ومستعد!"));
+service.on('ready', () => console.log("🚀 البوت متصل ومستعد للعمل في الروم المحدد!"));
 
-// تأكد من ضبط الإعدادات في GitHub Secrets أو هنا
 service.login(process.env.U_MAIL, process.env.U_PASS);
