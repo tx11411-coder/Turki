@@ -2,13 +2,12 @@ import wolfjs from 'wolf.js';
 import axios from 'axios';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// ⚠️ ضع مفتاحك هنا مباشرة كما طلبت
+// ملاحظة أمنية: يفضل استخدام ملف .env للمفتاح
 const GEMINI_API_KEY = 'AIzaSyBPR7jm6_v0ESdnLanaln8DLHQWLTFulZs'; 
 
 const { WOLF } = wolfjs;
 const service = new WOLF();
 
-// إعداد Gemini
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
 const settings = {
@@ -16,7 +15,7 @@ const settings = {
     verificationGroupId: 9969
 };
 
-// دالة تحويل رابط الصورة إلى صيغة Base64
+// دالة تحويل الصورة
 async function urlToGenerativePart(url) {
     const response = await axios.get(url, { responseType: 'arraybuffer' });
     return {
@@ -27,15 +26,14 @@ async function urlToGenerativePart(url) {
     };
 }
 
-// دالة الحل الذكية بواسطة Gemini AI
+// دالة الحل - تأكد من وجود try و catch بشكل سليم
 async function solveCaptchaWithAI(imageUrl) {
     console.log("👁️ جاري التحليل البصري الذكي للصورة...");
-    // استبدل السطر القديم بهذا السطر:
-const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-
+    try {
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
         const imagePart = await urlToGenerativePart(imageUrl);
-        const prompt = "في هذه الصورة يوجد عدة رموز. استخرج الرمز الموجود داخل المربع المظلل أو المميز فقط. أجب بالرمز المكون من 4 خانات فقط بدون أي كلمات إضافية.";
+        const prompt = "في هذه الصورة يوجد عدة رموز. استخرج الرمز الموجود داخل المربع المظلل فقط. أجب بالرمز المكون من 4 خانات فقط.";
 
         const result = await model.generateContent([prompt, imagePart]);
         const solution = result.response.text().trim();
@@ -67,5 +65,4 @@ service.on('groupMessage', async (message) => {
 
 service.on('ready', () => console.log("🚀 البوت متصل ومزود بالذكاء الاصطناعي!"));
 
-// تأكد من إضافة بيانات تسجيل الدخول هنا أيضاً
 service.login(process.env.U_MAIL, process.env.U_PASS);
