@@ -1,36 +1,25 @@
-name: XO Bot Runner
+name: Python CI
 
-on:
-  push:
-    branches: [ main ]
-  schedule:
-    - cron: '0 */4 * * *'
-  workflow_dispatch:
-
-concurrency:
-  group: xobot-group
-  cancel-in-progress: true
+on: [push]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: |
-          rm -rf node_modules package-lock.json
-          npm install --no-audit --no-fund
-          
-      - name: Run Bot
-        env:
-          U_MAIL: ${{ secrets.U_MAIL }}
-          U_PASS: ${{ secrets.U_PASS }}
-        run: node index.js
+    - uses: actions/checkout@v3
+    
+    # خطوة إعداد بايثون
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+        
+    # خطوة تثبيت المكتبات (بدلاً من npm install)
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    # خطوة تشغيل البوت (تأكد أن الملف باسم main.py)
+    - name: Run Bot
+      run: python main.py
