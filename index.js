@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { createRequire } from 'module';
 import wolfjs from 'wolf.js';
 
-// استخدام createRequire لحل مشكلة المكتبات القديمة
+// استخدام createRequire لحل مشكلة التوافق
 const require = createRequire(import.meta.url);
 const Jimp = require('jimp');
 const pixelmatch = require('pixelmatch');
@@ -12,7 +12,7 @@ const { WOLF } = wolfjs;
 const client = new WOLF();
 
 // الإعدادات
-const TARGET_USER_ID = "51660277";
+const TARGET_USER_ID = 51660277; // تأكد أنها رقم (بدون علامات تنصيص)
 const CHANNEL_ID = 81889058;
 
 client.on('ready', async () => {
@@ -21,37 +21,30 @@ client.on('ready', async () => {
 });
 
 client.on('groupMessage', async (message) => {
-    // 1. مراقبة الرسائل من المستخدم المحدد
+    // التحقق من هوية المرسل والقناة
     if (message.sourceSubscriberId == TARGET_USER_ID && message.targetGroupId == CHANNEL_ID) {
         
-        // 2. طباعة تفاصيل الرسالة لتشخيص المشكلة (ستظهر في سجلات GitHub)
-        console.log("📥 تم استلام رسالة من المستخدم المستهدف:");
-        console.log("Attachments count:", message.attachments ? message.attachments.length : "None");
-        
-        // 3. التحقق من وجود مرفقات (Attachments) أو وسائط (Media)
-        const attachment = message.attachments && message.attachments.length > 0 
-            ? message.attachments[0] 
-            : null;
+        // التحقق: هل النوع هو رابط صورة، أو هل البودي يحتوي على رابط ينتهي بـ .jpeg أو .jpg أو .png؟
+        const isImageLink = message.type === 'text/image_link' || (message.body && message.body.match(/\.(jpeg|jpg|png)$/i));
 
-        if (attachment) {
-            console.log("📸 تم اكتشاف مرفق! نوع المرفق:", attachment.mimeType);
+        if (isImageLink) {
+            const imgUrl = message.body;
+            console.log("📸 تم اكتشاف رابط صورة! جاري المعالجة...");
             
-            const imgUrl = attachment.link;
             try {
                 const similarity = await compareImages(imgUrl, 'reference.png');
                 console.log(`📊 نسبة التطابق: ${(similarity * 100).toFixed(2)}%`);
 
                 if (similarity >= 0.90) {
-                    console.log("✅ النتيجة: صورة مطابقة!");
+                    console.log("✅ النتيجة: مطابقة 90%+");
+                    // يمكنك هنا إضافة أمر لإرسال رسالة في القناة:
+                    // await client.messaging.sendGroupMessage(CHANNEL_ID, "تمت المطابقة بنجاح!");
                 } else {
-                    console.log("❌ النتيجة: صورة غير مطابقة.");
+                    console.log("❌ النتيجة: غير مطابقة");
                 }
             } catch (err) {
-                console.error("خطأ أثناء معالجة الصورة:", err.message);
+                console.error("خطأ في معالجة الصورة:", err.message);
             }
-        } else {
-            // إذا وصلنا هنا ولم يجد المرفق، سنطبع كامل الرسالة لنعرف أين تختبئ الصورة
-            console.log("⚠️ لم يتم العثور على مرفقات تقليدية. محتوى الرسالة:", JSON.stringify(message, null, 2));
         }
     }
 });
@@ -61,6 +54,7 @@ async function compareImages(imageUrl, refPath) {
     const img1 = await Jimp.read(imageUrl);
     const img2 = await Jimp.read(refPath);
 
+    // توحيد الأبعاد (300x150) للمقارنة
     const width = 300;
     const height = 150;
     img1.resize(width, height);
