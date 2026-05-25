@@ -12,12 +12,12 @@ const CHANNEL_ID = 81889058;
 const INTERVAL_MS = 63000;
 
 client.on('ready', async () => {
-    console.log("🚀 البوت متصل ومستعد! (يتجاهل النصوص ويركز على الصور فقط)");
+    console.log("🚀 البوت متصل! جاهز للعمل (يتجاهل النصوص، يحلل الصور فقط)");
     await client.group.joinById(CHANNEL_ID);
     startAutomation();
 });
 
-// الأتمتة (لا تتأثر بالرسائل)
+// الأتمتة (تعمل بشكل مستقل تماماً عن الرسائل)
 async function startAutomation() {
     setInterval(async () => {
         try {
@@ -30,16 +30,14 @@ async function startAutomation() {
     }, INTERVAL_MS);
 }
 
+// معالج الرسائل
 client.on('groupMessage', async (message) => {
-    // 1. التأكد من القناة والمستخدم
+    // 1. التحقق من المرسل والقناة
     if (message.sourceSubscriberId != TARGET_USER_ID || message.targetGroupId != CHANNEL_ID) return;
 
-    // 2. الفلتر الصارم: إذا لم تكن هناك مرفقات، تجاهل الرسالة تماماً ولا تفعل شيئاً
-    if (!message.attachments || message.attachments.length === 0) {
-        return; // خروج صامت (لا يظهر خطأ)
-    }
+    // 2. تجاهل الرسائل النصية تماماً (لا تعالج إلا إذا كان هناك مرفقات/صور)
+    if (!message.attachments || message.attachments.length === 0) return;
 
-    // 3. إذا وصلنا هنا، يعني أن هناك صورة
     const imageUrl = message.attachments[0].link;
     if (!imageUrl) return;
 
@@ -47,11 +45,16 @@ client.on('groupMessage', async (message) => {
         const response = await fetch(imageUrl);
         const buffer = Buffer.from(await response.arrayBuffer());
 
-        // التحقق النصي (هل الصورة كابتشا؟)
-        const isCaptcha = await isCaptchaImage(buffer);
-        if (!isCaptcha) return; 
+        // 3. الفحص الذكي: هل الصورة تحتوي على عبارة الاختبار؟
+        const isCaptcha = await checkIsCaptcha(buffer);
+        
+        if (!isCaptcha) {
+            console.log("⏭️ تم تجاهل صورة (ليست اختبار تحقق بشري).");
+            return;
+        }
 
-        console.log("🛡️ تم اكتشاف كابتشا، جاري الحل...");
+        // 4. إذا كانت كابتشا حقيقية، نقوم بحلها
+        console.log("🛡️ تم اكتشاف كابتشا! جاري الاستخراج...");
         const code = await solveCaptcha(buffer);
         
         if (code) {
@@ -59,16 +62,16 @@ client.on('groupMessage', async (message) => {
             console.log(`✅ تم الإرسال: #${code}`);
         }
     } catch (err) {
-        // خطأ صامت في معالجة الصور
         console.error("⚠️ خطأ في معالجة الصورة:", err.message);
     }
 });
 
-// دوال المعالجة
-async function isCaptchaImage(buffer) {
+// دالة التحقق من العنوان
+async function checkIsCaptcha(buffer) {
     try {
+        // نأخذ الجزء العلوي من الصورة فقط للسرعة
         const headerBuffer = await sharp(buffer)
-            .extract({ left: 0, top: 0, width: 1000, height: 300 })
+            .extract({ left: 0, top: 0, width: 1000, height: 250 })
             .greyscale()
             .threshold(150)
             .toBuffer();
@@ -77,12 +80,14 @@ async function isCaptchaImage(buffer) {
         const { data: { text } } = await worker.recognize(headerBuffer);
         await worker.terminate();
 
+        // هل تحتوي على كلمة "اختبار" أو "تحقق"؟
         return text.includes('اختبار') || text.includes('تحقق');
     } catch (e) {
         return false;
     }
 }
 
+// دالة الحل (استخراج الكود من الإطار الأصفر)
 async function solveCaptcha(buffer) {
     const { data, info } = await sharp(buffer).raw().ensureAlpha().toBuffer({ resolveWithObject: true });
     let minX = info.width, minY = info.height, maxX = 0, maxY = 0, found = false;
