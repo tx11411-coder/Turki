@@ -8,7 +8,7 @@ const client = new WOLF();
 
 // --- الإعدادات ---
 const TARGET_USER_ID = 76023604; 
-const CHANNEL_TASKS = 224;       // قناة المهام
+const CHANNEL_TASKS = 19287488;       // قناة المهام
 const CHANNEL_ALLIANCE = 224;    // قناة التحالف (غير الرقم حسب رغبتك)
 const TARGET_PLAYER_NAME = 'cat'; 
 
