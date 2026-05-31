@@ -12,6 +12,9 @@ const CHANNEL_TASKS = 224;       // قناة المهام
 const CHANNEL_ALLIANCE = 224;    // قناة التحالف
 const TARGET_PLAYER_NAME = 'cat'; 
 
+// متغير لتتبع وقت آخر أمر تم إرساله
+let lastCommandTime = 0;
+
 client.on('ready', async () => {
     console.log(`🚀 البوت متصل! يراقب القناتين: ${CHANNEL_TASKS} و ${CHANNEL_ALLIANCE}`);
     await client.group.joinById(CHANNEL_TASKS);
@@ -23,47 +26,24 @@ client.on('ready', async () => {
 async function startAutomation() {
     const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-    // 1. مهمة الصندوق فتح كل 5 دقائق (300,000 مللي ثانية)
-    setInterval(async () => {
-        try {
-            await client.messaging.sendGroupMessage(CHANNEL_TASKS, '!مد صندوق فتح');
-            console.log(`✅ تم إرسال "!مد صندوق فتح" تلقائياً`);
-        } catch (err) {
-            console.error("❌ خطأ في إرسال صندوق الفتح:", err.message);
-        }
-    }, 10 * 60 * 1000);
-
-    // 2. مهمة صندوق ضمان وقت كل ساعة (3,600,000 مللي ثانية)
-    setInterval(async () => {
-        try {
-            await client.messaging.sendGroupMessage(CHANNEL_TASKS, '!مد صندوق ضمان وقت');
-            console.log(`✅ تم إرسال "!مد صندوق ضمان وقت" تلقائياً`);
-        } catch (err) {
-            console.error("❌ خطأ في إرسال صندوق الضمان:", err.message);
-        }
-    }, 60 * 60 * 1000);
-
-    // الحلقة الأساسية للأوامر الدورية
     while (true) {
         try {
-            // 1. إرسال أمر المهام للقناة الأولى
+            // تحديث وقت إرسال الأمر
+            lastCommandTime = Date.now();
             await client.messaging.sendGroupMessage(CHANNEL_TASKS, '!مد مهام');
             console.log(`✅ تم إرسال "!مد مهام" للقناة ${CHANNEL_TASKS}`);
 
-            // انتظار ثانيتين بين الأمرين
             await sleep(2000);
 
-            // 2. إرسال أمر الإيداع للقناة الثانية
+            // تحديث وقت إرسال الأمر
+            lastCommandTime = Date.now();
             await client.messaging.sendGroupMessage(CHANNEL_ALLIANCE, '!مد تحالف ايداع كل');
             console.log(`✅ تم إرسال "!مد تحالف ايداع كل" للقناة ${CHANNEL_ALLIANCE}`);
 
-            // 3. انتظار 64 ثانية للدورة التالية
-            console.log("⏳ بانتظار 64 ثانية للبدء من جديد...");
-            await sleep(64000);
-
+            await sleep(64000); // انتظار 64 ثانية للدورة التالية
         } catch (err) {
             console.error("❌ خطأ في الأتمتة:", err.message);
-            await sleep(5000); // انتظار 5 ثواني عند الخطأ قبل المحاولة مجدداً
+            await sleep(5000);
         }
     }
 }
@@ -92,42 +72,6 @@ async function extractPlayerName(buffer) {
     }
 }
 
-// --- الاستقبال ---
-client.on('groupMessage', async (message) => {
-    // التحقق من القناتين
-    const isTargetChannel = (message.targetGroupId === CHANNEL_TASKS || message.targetGroupId === CHANNEL_ALLIANCE);
-    
-    if (!isTargetChannel || message.sourceSubscriberId != TARGET_USER_ID) return;
-    if (message.type !== 'text/image_link') return;
-
-    try {
-        const response = await fetch(message.body);
-        const buffer = Buffer.from(await response.arrayBuffer());
-
-        if (!(await isCaptchaByColor(buffer))) return;
-
-        const name = await extractPlayerName(buffer);
-        console.log(`👤 اللاعب المكتشف في قناة ${message.targetGroupId}: ${name}`);
-
-        if (!name.toLowerCase().includes(TARGET_PLAYER_NAME.toLowerCase())) {
-            console.log(`⏭️ تجاهل: الاسم "${name}" لا يطابق المطلوب.`);
-            return;
-        }
-
-        console.log(`✅ الاسم يطابق، جاري حل الكابتشا...`);
-        const code = await solveCaptcha(buffer);
-        
-        if (code) {
-            // الرد على نفس القناة التي جاءت منها الصورة
-            await client.messaging.sendGroupMessage(message.targetGroupId, `#${code}`);
-            console.log(`✅ تم الإرسال للقناة ${message.targetGroupId}: #${code}`);
-        }
-    } catch (err) {
-        console.error("⚠️ خطأ في المعالجة:", err.message);
-    }
-});
-
-// --- وظيفة حل الكابتشا ---
 async function solveCaptcha(buffer) {
     const { data, info } = await sharp(buffer).raw().ensureAlpha().toBuffer({ resolveWithObject: true });
     let minX = info.width, minY = info.height, maxX = 0, maxY = 0, found = false;
@@ -154,5 +98,45 @@ async function solveCaptcha(buffer) {
     await worker.terminate();
     return text.replace(/[^a-zA-Z0-9\u0621-\u064A]/g, '').trim();
 }
+
+// --- الاستقبال ---
+client.on('groupMessage', async (message) => {
+    // 1. التحقق من القناة والمرسل
+    const isTargetChannel = (message.targetGroupId === CHANNEL_TASKS || message.targetGroupId === CHANNEL_ALLIANCE);
+    if (!isTargetChannel || message.sourceSubscriberId != TARGET_USER_ID) return;
+    if (message.type !== 'text/image_link') return;
+
+    // 2. التحقق من نافذة الـ 4 ثواني (يجب أن تكون الرسالة خلال 4000 مللي ثانية من آخر أمر)
+    const timeDiff = Date.now() - lastCommandTime;
+    if (timeDiff > 4000) return;
+
+    try {
+        const response = await fetch(message.body);
+        const buffer = Buffer.from(await response.arrayBuffer());
+
+        if (!(await isCaptchaByColor(buffer))) return;
+
+        const name = await extractPlayerName(buffer);
+        console.log(`👤 اللاعب المكتشف: ${name}`);
+
+        // 3. التحقق من التطابق الدقيق للاسم باستخدام Regex (كلمة "cat" فقط)
+        const regex = new RegExp(`\\b${TARGET_PLAYER_NAME}\\b`, 'i');
+        
+        if (!regex.test(name)) {
+            console.log(`⏭️ تجاهل: الاسم "${name}" لا يطابق المطلوب.`);
+            return;
+        }
+
+        console.log(`✅ الاسم يطابق، جاري حل الكابتشا...`);
+        const code = await solveCaptcha(buffer);
+        
+        if (code) {
+            await client.messaging.sendGroupMessage(message.targetGroupId, `#${code}`);
+            console.log(`✅ تم الإرسال: #${code}`);
+        }
+    } catch (err) {
+        console.error("⚠️ خطأ في المعالجة:", err.message);
+    }
+});
 
 client.login(process.env.U_MAIL, process.env.U_PASS);
