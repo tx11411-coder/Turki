@@ -57,7 +57,7 @@ async function startAutomation() {
             await client.messaging.sendGroupMessage(CHANNEL_ALLIANCE, '!مد تحالف ايداع كل');
             console.log(`✅ تم إرسال "!مد تحالف ايداع كل" للقناة ${CHANNEL_ALLIANCE}`);
 
-            await sleep(64000); 
+            await sleep(306000); 
         } catch (err) {
             console.error("❌ خطأ في الأتمتة:", err.message);
             await sleep(5000);
