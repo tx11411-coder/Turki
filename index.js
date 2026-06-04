@@ -14,9 +14,20 @@ const ALLOWED_PLAYERS = ['cat'];
 
 let globalTimer = 0;
 
-// الدالة الوحيدة للتحكم بالإرسال - تضمن دائماً الهاشتاج في البداية
+/**
+ * دالة تنظيف النص: تزيل كل المسافات والرموز غير المرئية
+ */
+function cleanText(text) {
+    if (!text) return "";
+    // تزيل المسافات وكل الرموز غير المرئية (Unicode Control Characters)
+    return text.replace(/[\s\u200B-\u200F\u202A-\u202E\u2069]/g, '');
+}
+
+/**
+ * دالة التنسيق: تُرجع الهاشتاج ملتصقاً بالكلمة المنظفة فقط
+ */
 function formatAnswer(text) {
-    return "#" + text.trim();
+    return "#" + cleanText(text);
 }
 
 function escapeRegExp(string) {
@@ -66,7 +77,7 @@ async function solveCaptcha(buffer) {
     await worker.setParameters({ tessedit_pageseg_mode: '7' });
     const { data: { text } } = await worker.recognize(processedBuffer);
     await worker.terminate();
-    return text.replace(/[^a-zA-Z0-9\u0621-\u064A]/g, '').trim();
+    return text.replace(/[^a-zA-Z0-9\u0621-\u064A]/g, '');
 }
 
 // --- دالة منطق فتح الصناديق ---
