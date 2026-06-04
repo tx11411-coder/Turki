@@ -8,23 +8,26 @@ const { WOLF } = wolfjs;
 const client = new WOLF();
 
 // --- الإعدادات ---
-const TARGET_USER_ID = 76023604;
-const CHANNEL_ID = 224;
-const ALLOWED_PLAYERS = ['cat'];
+const TARGET_USER_ID = 80055399;
+const CHANNEL_ID = 81889058;
+const ALLOWED_PLAYERS = ['أوكسجينه', 'أوكسجيته', 'أوكسجيئه'];
 
 let globalTimer = 0;
 
 /**
- * دالة تنظيف النص: تزيل كل المسافات والرموز غير المرئية
+ * دالة التنظيف الصارمة: تستخرج فقط الأحرف والأرقام (العربية والإنجليزية)
+ * وتقوم بحذف أي شيء آخر (رموز خفية، مسافات، إلخ)
  */
 function cleanText(text) {
     if (!text) return "";
-    // تزيل المسافات وكل الرموز غير المرئية (Unicode Control Characters)
-    return text.replace(/[\s\u200B-\u200F\u202A-\u202E\u2069]/g, '');
+    // النطاق: [a-zA-Z] إنجليزي، [0-9] أرقام، [\u0621-\u064A] عربي
+    // أي شيء غير هذا النطاق يتم مسحه نهائياً
+    const match = text.match(/[a-zA-Z0-9\u0621-\u064A]+/g);
+    return match ? match.join('') : "";
 }
 
 /**
- * دالة التنسيق: تُرجع الهاشتاج ملتصقاً بالكلمة المنظفة فقط
+ * دالة التنسيق: تضع الهاشتاج ملتصقاً تماماً بالكلمة المنظفة
  */
 function formatAnswer(text) {
     return "#" + cleanText(text);
@@ -77,7 +80,7 @@ async function solveCaptcha(buffer) {
     await worker.setParameters({ tessedit_pageseg_mode: '7' });
     const { data: { text } } = await worker.recognize(processedBuffer);
     await worker.terminate();
-    return text.replace(/[^a-zA-Z0-9\u0621-\u064A]/g, '');
+    return cleanText(text);
 }
 
 // --- دالة منطق فتح الصناديق ---
