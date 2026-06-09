@@ -8,8 +8,8 @@ const { WOLF } = wolfjs;
 const client = new WOLF();
 
 // --- الإعدادات ---
-const TARGET_USER_ID = 76023048;
-const CHANNEL_ID = 1000;
+const TARGET_USER_ID = 76023604;
+const CHANNEL_ID = 224;
 const ALLOWED_PLAYERS = ['Trk'];
 
 let globalTimer = 0;
